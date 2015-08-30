@@ -115,7 +115,7 @@ int cadmouse_set_hwbutton(libusb_device_handle *device,
 
 int cadmouse_set_speed(libusb_device_handle *device, int speed)
 {
-    return cadmouse_send_command(device, 0x01, 0x00, speed + 0x40);
+    return cadmouse_send_command(device, 0x01, 0x00, speed);
 }
 
 libusb_device_handle *find_device(int vendor, int product, int *error)
@@ -276,7 +276,7 @@ int main(int argc, char **argv)
                 {
                     long int speed = strtol(optarg, NULL, 10);
 
-                    if (speed < 0 || speed > 100)
+                    if (speed < 1 || speed > 164)
                         fputs("-s: Option value out of range\n", stderr);
                     else
                         COMMAND(cadmouse_set_speed, speed);

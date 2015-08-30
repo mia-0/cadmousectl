@@ -42,7 +42,7 @@ cadmousectl [-[lprsS] value]
 |        |     Using this, you can assign an additional button to  |
 |        |     the wheel click. It will have id 11 on X11.         |
 +--------+---------------------------------------------------------+
-| -s     | Set speed (0-100).                                      |
+| -s     | Set speed (1-164).                                      |
 +--------+---------------------------------------------------------+
 | -S     | Enable (non-zero) or disable (zero) Smart Scroll.       |
 +--------+---------------------------------------------------------+
