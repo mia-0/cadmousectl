@@ -92,7 +92,8 @@ Button SWButtons[] = {
     { "middle", 0x0c },
     { "backward", 0x0d },
     { "forward", 0x0e },
-    { "rm", 0x2f },
+    { "rm", 0x2e },
+    { "extra", 0x2f },
     { NULL, NULL }
 };
 
