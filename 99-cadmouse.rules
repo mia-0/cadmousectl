@@ -1,0 +1,1 @@
+KERNEL=="hidraw*", ATTRS{idVendor}=="256f", ATTRS{idProduct}=="c650", RUN+="/usr/bin/cadmousectl -l 1 -p 1000 -r wheel:extra -s 164 -S 1"

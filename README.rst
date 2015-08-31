@@ -20,6 +20,9 @@ up access through udev rules. The mouse loses its settings each time it is
 disconnected, so you probably want to set up udev rules to run this tool
 anyway.
 
+The file ``99-cadmouse.rules`` contains an example udev rule that
+automatically runs cadmousectl whenever a CadMouse is plugged in.
+
 cadmousectl [-[lprsS] value]
 
 +--------+---------------------------------------------------------+
