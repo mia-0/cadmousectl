@@ -38,12 +38,18 @@ int cadmouse_set_smartscroll(int fd, int state)
 {
     int result;
 
-    result = cadmouse_send_command(fd, 0x03, 0x00, state ? 0x00 : 0x01);
+    if (state == 1 || state == 3)
+        result = cadmouse_send_command(fd, 0x03, 0x00, 0x00);
+    else if (state == 2)
+        result = cadmouse_send_command(fd, 0x03, 0x00, 0x01);
 
     if (result < 0)
         return result;
 
-    result = cadmouse_send_command(fd, 0x04, state ? 0x00 : 0xff, 0x00);
+    if (state == 3)
+        result = cadmouse_send_command(fd, 0x04, 0xff, 0x00);
+    else
+        result = cadmouse_send_command(fd, 0x04, state ? 0x00 : 0xff, 0x00);
 
     if (result < 0)
         return result;
@@ -252,10 +258,10 @@ int main(int argc, char **argv)
                 {
                     long int smartscroll = strtol(optarg, NULL, 10);
 
-                    if (smartscroll == 0)
-                        COMMAND(cadmouse_set_smartscroll, 0);
+                    if (smartscroll >= 0 && smartscroll < 4)
+                        COMMAND(cadmouse_set_smartscroll, smartscroll);
                     else
-                        COMMAND(cadmouse_set_smartscroll, 1);
+                        fputs("-S: Option value out of range\n", stderr);
                 }
                 break;
         }

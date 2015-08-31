@@ -47,7 +47,22 @@ cadmousectl [-[lprsS] value]
 +--------+---------------------------------------------------------+
 | -s     | Set speed (1-164).                                      |
 +--------+---------------------------------------------------------+
-| -S     | Enable (non-zero) or disable (zero) Smart Scroll.       |
+| -S     | Set Smart Scroll mode. There are two additional modes   |
+|        | which the Windows GUI does not expose.                  |
+|        |                                                         |
+|        | 0                                                       |
+|        |     off                                                 |
+|        | 1                                                       |
+|        |     normal                                              |
+|        | 2                                                       |
+|        |     slow                                                |
+|        | 3                                                       |
+|        |     accelerated scrolling                               |
+|        |                                                         |
+|        | Accelerated scrolling mode is different from the other  |
+|        | modes in that it does not simulate a flywheel but       |
+|        | instead sends more scroll wheel clicks the faster you   |
+|        | scroll.                                                 |
 +--------+---------------------------------------------------------+
 
 License
