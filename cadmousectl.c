@@ -13,41 +13,42 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <fcntl.h>
+#include <getopt.h>
+#include <libudev.h>
+#include <linux/hidraw.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <getopt.h>
-#include <libusb.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-int cadmouse_send_command(libusb_device_handle *device,
-                          int opt, int val1, int val2)
+int cadmouse_send_command(int fd, int opt, int val1, int val2)
 {
     unsigned char cmd[8] = { 0x0c, opt, val1, val2, 0x00, 0x00, 0x00, 0x00 };
-    int result = libusb_control_transfer(device,
-                                         LIBUSB_ENDPOINT_OUT |
-                                         LIBUSB_REQUEST_TYPE_CLASS |
-                                         LIBUSB_RECIPIENT_INTERFACE,
-                                         0x09, 0x030c, 0x0000, cmd, 8, 0);
+    int result = ioctl(fd, HIDIOCSFEATURE(8), cmd);
 
     return result < 0 ? result : 0;
 }
 
-int cadmouse_set_smartscroll(libusb_device_handle *device, int state)
+int cadmouse_set_smartscroll(int fd, int state)
 {
     int result;
 
-    result = cadmouse_send_command(device, 0x03, 0x00, state ? 0x00 : 0x01);
+    result = cadmouse_send_command(fd, 0x03, 0x00, state ? 0x00 : 0x01);
 
     if (result < 0)
         return result;
 
-    result = cadmouse_send_command(device, 0x04, state ? 0x00 : 0xff, 0x00);
+    result = cadmouse_send_command(fd, 0x04, state ? 0x00 : 0xff, 0x00);
 
     if (result < 0)
         return result;
 
-    result = cadmouse_send_command(device, 0x05, 0x00, state ? 0x01 : 0x00);
+    result = cadmouse_send_command(fd, 0x05, 0x00, state ? 0x01 : 0x00);
 
     return result;
 }
@@ -59,15 +60,14 @@ enum cadmouse_pollrate {
     POLL_1000 = 0x01
 };
 
-int cadmouse_set_pollrate(libusb_device_handle *device,
-                          enum cadmouse_pollrate rate)
+int cadmouse_set_pollrate(int fd, enum cadmouse_pollrate rate)
 {
-    return cadmouse_send_command(device, 0x06, 0x00, rate);
+    return cadmouse_send_command(fd, 0x06, 0x00, rate);
 }
 
-int cadmouse_set_liftoff_detection(libusb_device_handle *device, int state)
+int cadmouse_set_liftoff_detection(int fd, int state)
 {
-    return cadmouse_send_command(device, 0x07, 0x00, state ? 0x00 : 0x1f);
+    return cadmouse_send_command(fd, 0x07, 0x00, state ? 0x00 : 0x1f);
 }
 
 typedef struct Button {
@@ -107,121 +107,87 @@ Button *get_button(const char *name, Button *type)
     return type->name != NULL ? type : NULL;
 }
 
-int cadmouse_set_hwbutton(libusb_device_handle *device,
-                          Button *hw, Button *sw)
+int cadmouse_set_hwbutton(int fd, Button *hw, Button *sw)
 {
-    return cadmouse_send_command(device, hw->id, 0x00, sw->id);
+    return cadmouse_send_command(fd, hw->id, 0x00, sw->id);
 }
 
-int cadmouse_set_speed(libusb_device_handle *device, int speed)
+int cadmouse_set_speed(int fd, int speed)
 {
-    return cadmouse_send_command(device, 0x01, 0x00, speed);
+    return cadmouse_send_command(fd, 0x01, 0x00, speed);
 }
 
-libusb_device_handle *find_device(int vendor, int product, int *error)
+int find_device(const char *vendor, const char *product)
 {
-    libusb_device **list;
-    libusb_device *found = NULL;
-    libusb_device_handle *handle = NULL;
-    int err = 0;
-    ssize_t i = 0;
+    int fd = -1;
+    struct udev *udev;
+    struct udev_enumerate *enumerate;
+    struct udev_list_entry *devices, *dev_list_entry;
+    struct udev_device *dev, *parent;
 
-    ssize_t cnt = libusb_get_device_list (NULL, &list);
+    udev = udev_new();
+    if (udev == NULL) {
+        fputs("Cannot create udev context\n", stderr);
+        exit(1);
+    }
 
-    if (cnt < 0)
-        goto out;
+    enumerate = udev_enumerate_new(udev);
+    udev_enumerate_add_match_subsystem(enumerate, "hidraw");
+    udev_enumerate_scan_devices(enumerate);
 
-    for (i = 0; i < cnt; i++) {
-        libusb_device *device = list[i];
-        struct libusb_device_descriptor desc;
+    devices = udev_enumerate_get_list_entry(enumerate);
 
-        if (libusb_get_device_descriptor(device, &desc))
-            continue;
+    udev_list_entry_foreach(dev_list_entry, devices) {
+        const char *path, *vid, *pid;
 
-        if (desc.idVendor == vendor && desc.idProduct == product) {
-            found = device;
-            break;
+        path = udev_list_entry_get_name(dev_list_entry);
+        dev = udev_device_new_from_syspath(udev, path);
+        parent = udev_device_get_parent_with_subsystem_devtype(dev, "usb",
+                                                               "usb_device");
+
+        if (dev != NULL) {
+            vid = udev_device_get_sysattr_value(parent, "idVendor");
+            pid = udev_device_get_sysattr_value(parent, "idProduct");
+
+            if (!strcmp(vid, vendor) && !strcmp(pid, product)) {
+                path = udev_device_get_devnode(dev);
+                fd = open(path, O_RDONLY|O_NONBLOCK);
+
+                if (fd < 0)
+                    perror("open");
+            }
+
+            udev_device_unref(parent);
+
+            if (fd >= 0)
+                break;
         }
     }
 
-    if (found) {
-        err = libusb_open (found, &handle);
+    udev_enumerate_unref(enumerate);
+    udev_unref(udev);
 
-        if (err)
-            goto out_free;
-    }
-
-out_free:
-    libusb_free_device_list(list, 1);
-out:
-    if (error != NULL && err != 0)
-        *error = err;
-    return handle;
+    return fd;
 }
 
-#define ERROR(label, ...)                       \
-    do {                                        \
-        fprintf(stderr, "Error: " __VA_ARGS__); \
-        status = 1;                             \
-        goto label;                             \
-    } while (0)
-
-#define COMMAND(cmd, ...)                               \
-    do {                                                \
-        result = cmd(device, __VA_ARGS__);              \
-        if (result) {                                   \
-            ERROR(error_4, "operation failed: %s\n",    \
-                  libusb_error_name(result));           \
-        }                                               \
+#define COMMAND(cmd, ...)           \
+    do {                            \
+        res = cmd(fd, __VA_ARGS__); \
+        if (res) {                  \
+            perror(#cmd);           \
+            goto error;             \
+        }                           \
     } while (0)
 
 int main(int argc, char **argv)
 {
-    int result, opt, status = 0;
+    int opt, res;
 
-    result = libusb_init (NULL);
-    if (result)
-        ERROR(error_0, "libusb initialisation failed: %s\n",
-              libusb_error_name (result));
+    int fd = find_device("256f", "c650");
 
-    result = 0;
-    libusb_device_handle *device = find_device(0x256f, 0xc650, &result);
-
-    if (!device) {
-        if (result) {
-            ERROR(error_1, "couldn't open device: %s\n",
-                  libusb_error_name (result));
-        } else {
-            ERROR(error_1, "no suitable device found\n");
-        }
-    }
-
-    int reattach_driver = 0;
-
-    result = libusb_kernel_driver_active(device, 0);
-    switch (result) {
-        case 0:
-        case LIBUSB_ERROR_NOT_SUPPORTED:
-            break;
-        case 1:
-            reattach_driver = 1;
-            result = libusb_detach_kernel_driver(device, 0);
-
-            if (result) {
-                ERROR(error_2, "couldn't detach kernel driver: %s\n",
-                      libusb_error_name (result));
-            }
-
-            break;
-        default:
-            ERROR(error_2, "coudn't detect kernel driver presence: %s\n",
-                  libusb_error_name (result));
-    }
-
-    result = libusb_claim_interface(device, 0);
-    if (result) {
-        ERROR(error_3, "couldn't claim interface: %s\n",
-              libusb_error_name (result));
+    if (fd < 0) {
+        fputs("Could not find/open a CadMouse\n", stderr);
+        goto error;
     }
 
     extern char *optarg;
@@ -295,27 +261,11 @@ int main(int argc, char **argv)
         }
     }
 
-error_4:
-    result = libusb_release_interface(device, 0);
-    if (result) {
-        ERROR(error_3, "couldn't release interface: %s\n",
-              libusb_error_name (result));
-    }
+error:
 
-error_3:
-    if (reattach_driver) {
-        result = libusb_attach_kernel_driver(device, 0);
-        if (result) {
-            ERROR(error_2, "couldn't reattach kernel driver: %s\n",
-                  libusb_error_name (result));
-        }
-    }
+    if (fd >= 0)
+        close(fd);
 
-error_2:
-    libusb_close (device);
-error_1:
-    libusb_exit (NULL);
-error_0:
-    return status;
+    return 0;
 }
 

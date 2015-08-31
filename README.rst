@@ -8,9 +8,9 @@ protocol by looking at USB captures from a Windows VM running its settings tool.
 Compilation
 ===========
 
-This needs libusb.
+This needs libudev.
 
-``cc $(pkg-config --cflags --libs libusb-1.0) cadmousectl.c -o cadmousectl``
+``cc $(pkg-config --cflags --libs libudev) cadmousectl.c -o cadmousectl``
 
 Usage
 =====
