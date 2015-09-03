@@ -40,7 +40,7 @@ int cadmouse_set_smartscroll(int fd, int state)
 
     if (state == 1 || state == 3)
         result = cadmouse_send_command(fd, 0x03, 0x00, 0x00);
-    else if (state == 2)
+    else
         result = cadmouse_send_command(fd, 0x03, 0x00, 0x01);
 
     if (result < 0)
