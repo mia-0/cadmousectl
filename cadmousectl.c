@@ -198,7 +198,8 @@ int main(int argc, char **argv)
 
     extern char *optarg;
     extern int optind, opterr, optopt;
-    while ((opt = getopt(argc, argv, "l:p:r:s:S:")) != -1) {
+    int speedconflict = 0;
+    while ((opt = getopt(argc, argv, "l:p:r:s:d:S:")) != -1) {
         switch(opt) {
             case 'l':
                 {
@@ -247,12 +248,28 @@ int main(int argc, char **argv)
             case 's':
                 {
                     long int speed = strtol(optarg, NULL, 10);
-
+                    if (speedconflict != 0)
+                        fputs("-s: -s cannot be used with -d or used more than once\n", stderr);
+		    else
                     if (speed < 1 || speed > 164)
                         fputs("-s: Option value out of range\n", stderr);
                     else
+                        speedconflict++;
                         COMMAND(cadmouse_set_speed, speed);
                 }
+                break;
+             case 'd':
+                {
+                    long int dpi = strtol(optarg, NULL, 10);
+                    long int speed = (dpi * 164)/8200;
+                    if (speedconflict != 0)
+                        fputs("-d: -d cannot be used with -s or used more than once\n", stderr);
+                    if (dpi < 50 || dpi > 8200)
+                        fputs("-d: Option value out of range\n", stderr);
+                    else
+			speedconflict++;
+                        COMMAND(cadmouse_set_speed, speed);
+                }       
                 break;
             case 'S':
                 {
