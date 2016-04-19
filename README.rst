@@ -46,6 +46,10 @@ cadmousectl [-[lprsS] value]
 |        |     the wheel click. It will have id 11 on X11.         |
 +--------+---------------------------------------------------------+
 | -s     | Set speed (1-164).                                      |
+|        | Cannot be used with -d                                  |
++--------+---------------------------------------------------------+
+| -d     | Set speed in DPI (50-8200).                             |
+|        | Cannot be used with -s
 +--------+---------------------------------------------------------+
 | -S     | Set Smart Scroll mode. There are two additional modes   |
 |        | which the Windows GUI does not expose.                  |
