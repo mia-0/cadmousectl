@@ -10,7 +10,7 @@ Compilation
 
 This needs libudev.
 
-``cc $(pkg-config --cflags --libs libudev) cadmousectl.c -o cadmousectl``
+``cc cadmousectl.c -o cadmousectl $(pkg-config --cflags --libs libudev)``
 
 Usage
 =====
