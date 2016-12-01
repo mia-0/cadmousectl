@@ -8,18 +8,26 @@ protocol by looking at USB captures from a Windows VM running its settings tool.
 Compilation
 ===========
 
-This needs libudev.
+This needs HIDApi.
 
-``cc cadmousectl.c -o cadmousectl $(pkg-config --cflags --libs libudev)``
+Linux
+~~~~~
+
+``cc cadmousectl.c -o cadmousectl $(pkg-config --cflags --libs hidapi-hidraw)``
+
+Windows, macOS, \*BSD, …
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+``cc cadmousectl.c -o cadmousectl $(pkg-config --cflags --libs hidapi)``
+
 
 Usage
 =====
 
-This tool needs write access to the USB device, so either run as root or set
-up access through udev rules. The mouse loses its settings each time it is
-disconnected, so you probably want to set up udev rules to run this tool
-anyway.
+This tool needs write access to the USB device. The mouse loses its settings
+each time it is disconnected.
 
+On Linux, you probably want to set up udev rules to run this tool.
 The file ``99-cadmouse.rules`` contains an example udev rule that
 automatically runs cadmousectl whenever a CadMouse is plugged in.
 

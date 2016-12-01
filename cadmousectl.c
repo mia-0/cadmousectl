@@ -13,48 +13,40 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <fcntl.h>
 #include <getopt.h>
-#include <libudev.h>
-#include <linux/hidraw.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-int cadmouse_send_command(int fd, int opt, int val1, int val2)
+#include <hidapi.h>
+
+int cadmouse_send_command(hid_device *mouse, int opt, int val1, int val2)
 {
     unsigned char cmd[8] = { 0x0c, opt, val1, val2, 0x00, 0x00, 0x00, 0x00 };
-    int result = ioctl(fd, HIDIOCSFEATURE(8), cmd);
-
-    return result < 0 ? result : 0;
+    return hid_send_feature_report(mouse, cmd, 8);
 }
 
-int cadmouse_set_smartscroll(int fd, int state)
+int cadmouse_set_smartscroll(hid_device *mouse, int state)
 {
     int result;
 
     if (state == 1 || state == 3)
-        result = cadmouse_send_command(fd, 0x03, 0x00, 0x00);
+        result = cadmouse_send_command(mouse, 0x03, 0x00, 0x00);
     else
-        result = cadmouse_send_command(fd, 0x03, 0x00, 0x01);
+        result = cadmouse_send_command(mouse, 0x03, 0x00, 0x01);
 
     if (result < 0)
         return result;
 
     if (state == 3)
-        result = cadmouse_send_command(fd, 0x04, 0xff, 0x00);
+        result = cadmouse_send_command(mouse, 0x04, 0xff, 0x00);
     else
-        result = cadmouse_send_command(fd, 0x04, state ? 0x00 : 0xff, 0x00);
+        result = cadmouse_send_command(mouse, 0x04, state ? 0x00 : 0xff, 0x00);
 
     if (result < 0)
         return result;
 
-    result = cadmouse_send_command(fd, 0x05, 0x00, state ? 0x01 : 0x00);
+    result = cadmouse_send_command(mouse, 0x05, 0x00, state ? 0x01 : 0x00);
 
     return result;
 }
@@ -66,14 +58,14 @@ enum cadmouse_pollrate {
     POLL_1000 = 0x01
 };
 
-int cadmouse_set_pollrate(int fd, enum cadmouse_pollrate rate)
+int cadmouse_set_pollrate(hid_device *mouse, enum cadmouse_pollrate rate)
 {
-    return cadmouse_send_command(fd, 0x06, 0x00, rate);
+    return cadmouse_send_command(mouse, 0x06, 0x00, rate);
 }
 
-int cadmouse_set_liftoff_detection(int fd, int state)
+int cadmouse_set_liftoff_detection(hid_device *mouse, int state)
 {
-    return cadmouse_send_command(fd, 0x07, 0x00, state ? 0x00 : 0x1f);
+    return cadmouse_send_command(mouse, 0x07, 0x00, state ? 0x00 : 0x1f);
 }
 
 typedef struct Button {
@@ -89,7 +81,7 @@ Button HWButtons[] = {
     { "forward", 0x0e },
     { "backward", 0x0f },
     { "rm", 0x10 },
-    { NULL, NULL }
+    { NULL, 0 }
 };
 
 Button SWButtons[] = {
@@ -100,7 +92,7 @@ Button SWButtons[] = {
     { "forward", 0x0e },
     { "rm", 0x2e },
     { "extra", 0x2f },
-    { NULL, NULL }
+    { NULL, 0 }
 };
 
 Button *get_button(const char *name, Button *type)
@@ -113,85 +105,32 @@ Button *get_button(const char *name, Button *type)
     return type->name != NULL ? type : NULL;
 }
 
-int cadmouse_set_hwbutton(int fd, Button *hw, Button *sw)
+int cadmouse_set_hwbutton(hid_device *mouse, Button *hw, Button *sw)
 {
-    return cadmouse_send_command(fd, hw->id, 0x00, sw->id);
+    return cadmouse_send_command(mouse, hw->id, 0x00, sw->id);
 }
 
-int cadmouse_set_speed(int fd, int speed)
+int cadmouse_set_speed(hid_device *mouse, int speed)
 {
-    return cadmouse_send_command(fd, 0x01, 0x00, speed);
+    return cadmouse_send_command(mouse, 0x01, 0x00, speed);
 }
 
-int find_device(const char *vendor, const char *product)
-{
-    int fd = -1;
-    struct udev *udev;
-    struct udev_enumerate *enumerate;
-    struct udev_list_entry *devices, *dev_list_entry;
-    struct udev_device *dev, *parent;
-
-    udev = udev_new();
-    if (udev == NULL) {
-        fputs("Cannot create udev context\n", stderr);
-        exit(1);
-    }
-
-    enumerate = udev_enumerate_new(udev);
-    udev_enumerate_add_match_subsystem(enumerate, "hidraw");
-    udev_enumerate_scan_devices(enumerate);
-
-    devices = udev_enumerate_get_list_entry(enumerate);
-
-    udev_list_entry_foreach(dev_list_entry, devices) {
-        const char *path, *vid, *pid;
-
-        path = udev_list_entry_get_name(dev_list_entry);
-        dev = udev_device_new_from_syspath(udev, path);
-        parent = udev_device_get_parent_with_subsystem_devtype(dev, "usb",
-                                                               "usb_device");
-
-        if (dev != NULL) {
-            vid = udev_device_get_sysattr_value(parent, "idVendor");
-            pid = udev_device_get_sysattr_value(parent, "idProduct");
-
-            if (!strcmp(vid, vendor) && !strcmp(pid, product)) {
-                path = udev_device_get_devnode(dev);
-                fd = open(path, O_RDONLY|O_NONBLOCK);
-
-                if (fd < 0)
-                    perror("open");
-            }
-
-            udev_device_unref(parent);
-
-            if (fd >= 0)
-                break;
-        }
-    }
-
-    udev_enumerate_unref(enumerate);
-    udev_unref(udev);
-
-    return fd;
-}
-
-#define COMMAND(cmd, ...)           \
-    do {                            \
-        res = cmd(fd, __VA_ARGS__); \
-        if (res) {                  \
-            perror(#cmd);           \
-            goto error;             \
-        }                           \
+#define COMMAND(cmd, ...)                                          \
+    do {                                                           \
+        res = cmd(mouse, __VA_ARGS__);                             \
+        if (res == -1) {                                           \
+            fwprintf(stderr, L"%s: %s\n", #cmd, hid_error(mouse)); \
+            goto error;                                            \
+        }                                                          \
     } while (0)
 
 int main(int argc, char **argv)
 {
     int opt, res;
 
-    int fd = find_device("256f", "c650");
+    hid_device *mouse = hid_open(0x256f, 0xc650, NULL);
 
-    if (fd < 0) {
+    if (mouse == NULL) {
         fputs("Could not find/open a CadMouse\n", stderr);
         goto error;
     }
@@ -286,8 +225,10 @@ int main(int argc, char **argv)
 
 error:
 
-    if (fd >= 0)
-        close(fd);
+    if (mouse != NULL) {
+        hid_close(mouse);
+        hid_exit();
+    }
 
     return 0;
 }
