@@ -250,7 +250,7 @@ int main(int argc, char **argv)
                     long int speed = strtol(optarg, NULL, 10);
                     if (speedconflict != 0)
                         fputs("-s: -s cannot be used with -d or used more than once\n", stderr);
-		    else
+                    else
                     if (speed < 1 || speed > 164)
                         fputs("-s: Option value out of range\n", stderr);
                     else
@@ -267,9 +267,9 @@ int main(int argc, char **argv)
                     if (dpi < 50 || dpi > 8200)
                         fputs("-d: Option value out of range\n", stderr);
                     else
-			speedconflict++;
+                        speedconflict++;
                         COMMAND(cadmouse_set_speed, speed);
-                }       
+                }
                 break;
             case 'S':
                 {
