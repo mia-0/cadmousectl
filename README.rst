@@ -25,11 +25,24 @@ Usage
 =====
 
 This tool needs write access to the USB device. The mouse loses its settings
-each time it is disconnected.
+each time it is disconnected. Therefore, you will probably want to set up
+``cadmousectl`` to run automatically. Each rules file needs to be modified
+as necessary (the path to ``cadmousectl`` and the parameters).
 
-On Linux, you probably want to set up udev rules to run this tool.
-The file ``99-cadmouse.rules`` contains an example udev rule that
-automatically runs cadmousectl whenever a CadMouse is plugged in.
+Linux
+~~~~~
+
+Copy the ``rules/linux/99-cadmouse.rules`` file into ``/etc/udev/rules.d``
+and reload ``udevd``.
+
+FreeBSD
+~~~~~~~
+
+Copy the ``rules/freebsd/cadmouse.conf`` file into ``/usr/local/etc/devd``
+and reload ``devd``.
+
+Parameters
+~~~~~~~~~~
 
 cadmousectl [-[lprsS] value]
 
