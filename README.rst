@@ -18,6 +18,8 @@ Linux
 Windows, macOS, \*BSD, …
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
+Windows builds are availabe on the GitHub Releases page.
+
 ``cc cadmousectl.c -o cadmousectl $(pkg-config --cflags --libs hidapi)``
 
 
